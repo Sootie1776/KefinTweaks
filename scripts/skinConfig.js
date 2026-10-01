@@ -11,7 +11,8 @@
     // ============================================================================
 
     const getKefinTweaksRoot = () => {
-        return window.KefinTweaksConfig?.kefinTweaksRoot || 'https://ranaldsgift.github.io/KefinTweaks/';
+        return window.KefinTweaksConfig?.kefinTweaksRoot
+            || 'https://cdn.jsdelivr.net/gh/Sootie1776/KefinTweaks@experimental/';
     }
     
     const KEFIN_TWEAKS_DEFAULT_SKINS_CONFIG = {
@@ -1291,4 +1292,3 @@
     console.log('[KefinTweaks SkinConfig] Default skin configuration loaded. Available at window.KefinTweaksDefaultSkinsConfig');
     
 })();
-

@@ -9,6 +9,27 @@
     // Developers can set this to false to disable the behavior.
     const FADE_IN_SECTIONS = true;
 
+    // Optional account-scoped performance mode. The allowlist is supplied by
+    // the server's private JS Injector configuration rather than committed to
+    // this public fork. With no allowlist configured, behavior is unchanged.
+    function isPerformanceTestUser() {
+        try {
+            const userId = typeof ApiClient !== 'undefined' && typeof ApiClient.getCurrentUserId === 'function'
+                ? String(ApiClient.getCurrentUserId() || '')
+                : '';
+            if (!userId) return false;
+
+            const configured = window.KefinTweaksConfig?.performanceTestUserIds
+                || window.__KefinTweaksPerformanceTestUsers;
+            const ids = configured instanceof Set
+                ? configured
+                : new Set(Array.isArray(configured) ? configured.map(String) : []);
+            return ids.has(userId);
+        } catch (_) {
+            return false;
+        }
+    }
+
     // Sliding window: render current slide + 4 prev + 4 next (9 total). As user navigates, remove/add slides.
     const SPOTLIGHT_WINDOW_PREV = 4;
     const SPOTLIGHT_WINDOW_NEXT = 4;
@@ -6913,6 +6934,8 @@
     // Smart Lazy Image Loading with Global Observers
     let lazyImageObserver = null;
     let lazyMutationObserver = null;
+    const lazyMutationPendingNodes = new Set();
+    let lazyMutationDrainRaf = null;
     /** @type {WeakMap<Element, IntersectionObserver>} */
     const lazyObserversByScroller = new WeakMap();
     const lazyImageApplyQueue = [];
@@ -7113,7 +7136,10 @@
         return new IntersectionObserver(handleLazyImageIntersection, {
             root: root || null,
             threshold: mobile ? 0 : 0.1,
-            rootMargin: mobile ? '0px' : '800px'
+            // The normal 800px margin eagerly starts many image requests. The
+            // test profile keeps the visible row responsive while still
+            // preloading a reasonable amount of content below the fold.
+            rootMargin: mobile ? '0px' : (isPerformanceTestUser() ? '300px' : '800px')
         });
     }
 
@@ -7145,6 +7171,42 @@
 
         lazyImageObserver.observe(cardImageContainer);
     }
+
+    function processLazyMutationNode(node) {
+        if (!node || node.nodeType !== 1 || node.isConnected === false) return;
+
+        if (node.classList?.contains('cardImageContainer') && node.hasAttribute('data-src')) {
+            observeLazyImage(node);
+        }
+
+        if (node.querySelectorAll) {
+            node.querySelectorAll('.cardImageContainer[data-src]').forEach(observeLazyImage);
+        }
+
+        observePendingBlurhashInNode(node);
+    }
+
+    function drainLazyMutationQueue() {
+        lazyMutationDrainRaf = null;
+        let processed = 0;
+        while (lazyMutationPendingNodes.size && processed < 50) {
+            const node = lazyMutationPendingNodes.values().next().value;
+            lazyMutationPendingNodes.delete(node);
+            processLazyMutationNode(node);
+            processed += 1;
+        }
+        if (lazyMutationPendingNodes.size) {
+            lazyMutationDrainRaf = requestAnimationFrame(drainLazyMutationQueue);
+        }
+    }
+
+    function enqueueLazyMutationNode(node) {
+        if (!node || node.nodeType !== 1) return;
+        lazyMutationPendingNodes.add(node);
+        if (lazyMutationDrainRaf == null) {
+            lazyMutationDrainRaf = requestAnimationFrame(drainLazyMutationQueue);
+        }
+    }
     
     /**
      * Initialize the global MutationObserver to detect new elements
@@ -7158,26 +7220,15 @@
         }
         
         lazyMutationObserver = new MutationObserver((mutations) => {
-            mutations.forEach(mutation => {
-                mutation.addedNodes.forEach(node => {
-                    // Check if the added node itself is a cardImageContainer with data-src
-                    if (node.nodeType === 1 && // Element node
-                        node.classList && 
-                        node.classList.contains('cardImageContainer') &&
-                        node.hasAttribute('data-src')) {
-                        observeLazyImage(node);
-                    }
-                    
-                    // Check for cardImageContainer descendants
-                    if (node.nodeType === 1 && node.querySelectorAll) {
-                        const lazyImages = node.querySelectorAll('.cardImageContainer[data-src]');
-                        lazyImages.forEach(img => {
-                            observeLazyImage(img);
-                        });
-                    }
-
-                    observePendingBlurhashInNode(node);
+            if (isPerformanceTestUser()) {
+                mutations.forEach(mutation => {
+                    mutation.addedNodes.forEach(enqueueLazyMutationNode);
                 });
+                return;
+            }
+
+            mutations.forEach(mutation => {
+                mutation.addedNodes.forEach(processLazyMutationNode);
             });
         });
     }

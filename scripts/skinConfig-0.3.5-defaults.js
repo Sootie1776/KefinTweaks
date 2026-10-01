@@ -11,7 +11,8 @@
     // ============================================================================
 
     const getKefinTweaksRoot = () => {
-        return window.KefinTweaksConfig?.kefinTweaksRoot || 'https://ranaldsgift.github.io/KefinTweaks/';
+        return window.KefinTweaksConfig?.kefinTweaksRoot
+            || 'https://cdn.jsdelivr.net/gh/Sootie1776/KefinTweaks@experimental/';
     }
     
     const KEFIN_TWEAKS_LEGACY_SKIN_DEFAULTS = {
@@ -436,4 +437,3 @@
     console.log('[KefinTweaks Legacy Skin Defaults] Canonical defaults (v0.3.5) loaded. Available at window.KefinTweaksLegacySkinDefaults');
     
 })();
-

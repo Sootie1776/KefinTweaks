@@ -5,6 +5,8 @@
 (function() {
     'use strict';
 
+    const GITHUB_REPO = 'Sootie1776/KefinTweaks';
+
     console.log('[KefinTweaks Injector] Initializing...');    
     // Cache for resolved root URL (to avoid multiple API calls)
     let resolvedRootCache = null;
@@ -92,7 +94,7 @@
     
     /**
      * Extracts version string from root URL
-     * @param {string} root - The root URL (e.g., "https://cdn.jsdelivr.net/gh/ranaldsgift/KefinTweaks@v0.3.3/")
+     * @param {string} root - The root URL (e.g., "https://cdn.jsdelivr.net/gh/Sootie1776/KefinTweaks@v0.3.3/")
      * @returns {string} Version string (e.g., "0.3.3", "latest", "development", or commit hash)
      */
     function extractVersionFromRoot(root) {
@@ -798,7 +800,7 @@
         if (latestMatch) {
             // Fetch the latest release version number
             try {
-                const response = await fetch('https://api.github.com/repos/ranaldsgift/KefinTweaks/releases/latest');
+                const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
                 if (response.ok) {
                     const data = await response.json();
                     if (data && data.tag_name) {
@@ -819,7 +821,7 @@
         } else if (mainMatch) {
             // Fetch the latest commit hash from the main branch
             try {
-                const response = await fetch('https://api.github.com/repos/ranaldsgift/KefinTweaks/commits/main');
+                const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/commits/main`);
                 if (response.ok) {
                     const commit = await response.json();
                     if (commit && commit.sha) {
@@ -839,7 +841,7 @@
         } else if (experimentalMatch) {
             // Fetch the latest commit hash from the experimental branch
             try {
-                const response = await fetch('https://api.github.com/repos/ranaldsgift/KefinTweaks/commits/experimental');
+                const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/commits/experimental`);
                 if (response.ok) {
                     const commit = await response.json();
                     if (commit && commit.sha) {

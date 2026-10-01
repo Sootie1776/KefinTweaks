@@ -27,8 +27,8 @@
     }
 
     // jsDelivr URL patterns
-    const JSDELIVR_BASE = 'https://cdn.jsdelivr.net/gh/ranaldsgift/KefinTweaks';
-    const GITHUB_REPO = 'ranaldsgift/KefinTweaks';
+    const JSDELIVR_BASE = 'https://cdn.jsdelivr.net/gh/Sootie1776/KefinTweaks';
+    const GITHUB_REPO = 'Sootie1776/KefinTweaks';
     const GITHUB_API_RELEASES = `https://api.github.com/repos/${GITHUB_REPO}/releases`;
 
     // Check if user is admin
@@ -439,7 +439,7 @@ window.KefinTweaksConfig = ${JSON.stringify(config, null, 2)};`;
             return { sourceType: 'github', version: LATEST_RELEASE_NAME };
         }
 
-        const match = url.match(/cdn\.jsdelivr\.net\/gh\/ranaldsgift\/KefinTweaks@([^\/]+)\//);
+        const match = url.match(/cdn\.jsdelivr\.net\/gh\/[^/]+\/KefinTweaks@([^\/]+)\//);
         
         if (!match) {
             return { sourceType: 'custom', version: null };
@@ -984,7 +984,7 @@ window.KefinTweaksConfig = ${JSON.stringify(config, null, 2)};`;
                 } else if (sourceInfo.version === LATEST_RELEASE_NAME) {
                     // Fetch the actual latest version number
                     try {
-                        const response = await fetch('https://api.github.com/repos/ranaldsgift/KefinTweaks/releases/latest');
+                        const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
                         if (response.ok) {
                             const data = await response.json();
                             const versionNumber = data.tag_name.replace(/^v/, '');
@@ -1176,7 +1176,7 @@ window.KefinTweaksConfig = ${JSON.stringify(config, null, 2)};`;
                 } else if (sourceInfo.version === LATEST_RELEASE_NAME) {
                     // Fetch the actual latest version number
                     try {
-                        const response = await fetch('https://api.github.com/repos/ranaldsgift/KefinTweaks/releases/latest');
+                        const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
                         if (response.ok) {
                             const data = await response.json();
                             const versionNumber = data.tag_name.replace(/^v/, '');
@@ -1372,7 +1372,7 @@ window.KefinTweaksConfig = ${JSON.stringify(config, null, 2)};`;
                 } else if (sourceInfo.version === LATEST_RELEASE_NAME) {
                     // Fetch the actual latest version number
                     try {
-                        const response = await fetch('https://api.github.com/repos/ranaldsgift/KefinTweaks/releases/latest');
+                        const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
                         if (response.ok) {
                             const data = await response.json();
                             const versionNumber = data.tag_name.replace(/^v/, '');
@@ -1525,7 +1525,7 @@ window.KefinTweaksConfig = ${JSON.stringify(config, null, 2)};`;
                 let img = card.querySelector('img');
     
                 if (img) {
-                    img.src = 'https://raw.githubusercontent.com/ranaldsgift/KefinTweaks/refs/heads/main/logo.png';
+                    img.src = 'https://raw.githubusercontent.com/Sootie1776/KefinTweaks/refs/heads/experimental/logo.png';
                     img.style.width = 'auto';
                     img.style.height = '100%';
                     img.parentNode.style.background = 'linear-gradient(to bottom, #202020, #101010)';
@@ -1533,7 +1533,7 @@ window.KefinTweaksConfig = ${JSON.stringify(config, null, 2)};`;
                     img = document.createElement('div');
                     img.className = 'defaultCardBackground';
                     // give the gradient some color
-                    img.style.background = 'url(https://raw.githubusercontent.com/ranaldsgift/KefinTweaks/refs/heads/main/logo.png), linear-gradient(to bottom, #202020, #101010)';
+                    img.style.background = 'url(https://raw.githubusercontent.com/Sootie1776/KefinTweaks/refs/heads/experimental/logo.png), linear-gradient(to bottom, #202020, #101010)';
                     img.style.backgroundSize = 'contain';
                     img.style.backgroundPosition = 'center';
                     img.style.backgroundRepeat = 'no-repeat';
@@ -1767,7 +1767,7 @@ main.MuiBox-root .customPage.libraryPage:not(.noSecondaryNavPage)[data-kefin-cus
 
         if (latestMatch) {
             try {
-                const response = await fetch('https://api.github.com/repos/ranaldsgift/KefinTweaks/releases/latest');
+                const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
                 if (response.ok) {
                     const data = await response.json();
                     if (data && data.tag_name) {
@@ -1787,7 +1787,7 @@ main.MuiBox-root .customPage.libraryPage:not(.noSecondaryNavPage)[data-kefin-cus
 
         if (mainMatch) {
             try {
-                const response = await fetch('https://api.github.com/repos/ranaldsgift/KefinTweaks/commits/main');
+                const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/commits/main`);
                 if (response.ok) {
                     const commit = await response.json();
                     if (commit && commit.sha) {
@@ -1806,7 +1806,7 @@ main.MuiBox-root .customPage.libraryPage:not(.noSecondaryNavPage)[data-kefin-cus
 
         if (experimentalMatch) {
             try {
-                const response = await fetch('https://api.github.com/repos/ranaldsgift/KefinTweaks/commits/experimental');
+                const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/commits/experimental`);
                 if (response.ok) {
                     const commit = await response.json();
                     if (commit && commit.sha) {
@@ -1965,4 +1965,3 @@ main.MuiBox-root .customPage.libraryPage:not(.noSecondaryNavPage)[data-kefin-cus
 
     console.log('[KefinTweaks Installer] Installer script loaded');
 })();
-

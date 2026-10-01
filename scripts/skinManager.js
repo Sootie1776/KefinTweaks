@@ -175,8 +175,7 @@
         
         // Match pattern: .../KefinTweaks/skins/{filename}.css
         // This works for various formats:
-        // - https://ranaldsgift.github.io/KefinTweaks/skins/elegantKefin.css
-        // - https://cdn.jsdelivr.net/gh/ranaldsgift/KefinTweaks@main/skins/elegantKefin.css
+        // - https://cdn.jsdelivr.net/gh/Sootie1776/KefinTweaks@experimental/skins/elegantKefin.css
         // - https://selfhosted.com/KefinTweaks/skins/elegantKefin.css
         const kefinTweaksSkinPattern = /\/KefinTweaks\/skins\/([^\/\?]+\.css)(?:\?.*)?$/i;
         const match = normalized.match(kefinTweaksSkinPattern);

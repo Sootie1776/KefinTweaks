@@ -938,7 +938,7 @@
     }
 
     function isOfficialJsDelivrKefinRoot(root) {
-        return /cdn\.jsdelivr\.net\/gh\/ranaldsgift\/KefinTweaks@/i.test(String(root || ''));
+        return /cdn\.jsdelivr\.net\/gh\/[^/]+\/KefinTweaks@/i.test(String(root || ''));
     }
 
     /**
@@ -982,7 +982,7 @@
             '  if (cfg.enabled !== true) return;',
             '  var symbolicRoot = cfg.kefinTweaksRoot || \'\';',
             '  var isExperimental = /@experimental(\\/|$)/i.test(String(symbolicRoot));',
-            '  var isOfficialCdn = /cdn\\.jsdelivr\\.net\\/gh\\/ranaldsgift\\/KefinTweaks@/i.test(String(symbolicRoot));',
+            '  var isOfficialCdn = /cdn\\.jsdelivr\\.net\\/gh\\/[^/]+\\/KefinTweaks@/i.test(String(symbolicRoot));',
             '  if (!String(symbolicRoot).trim()) return;',
             '  if (!isExperimental && isOfficialCdn) return;',
             '  var resolvedRoot = String(cfg.kefinTweaksRootResolved || cfg.kefinTweaksRoot || \'\').trim();',
