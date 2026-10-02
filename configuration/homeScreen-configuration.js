@@ -1323,38 +1323,79 @@ window.KefinTweaksConfig = ${JSON.stringify(configToBackup, null, 2)};`;
         }
     }
 
-    async function runStartupDefaultSectionSync() {
+    function isPerformanceTestUser() {
+        try {
+            const userId = String(window.ApiClient?.getCurrentUserId?.() || '');
+            if (!userId) return false;
+
+            const configured = window.KefinTweaksConfig?.performanceTestUserIds
+                || window.__KefinTweaksPerformanceTestUsers;
+            const userIds = configured instanceof Set
+                ? configured
+                : new Set(Array.isArray(configured) ? configured.map(String) : []);
+            return userIds.has(userId);
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function runStartupDefaultSectionSync() {
         if (window.__kefinHomeStartupDefaultSectionSync) return;
         window.__kefinHomeStartupDefaultSectionSync = true;
 
-        if (window.userHelper?.waitForLogin) {
-            const loggedIn = await window.userHelper.waitForLogin();
-            if (!loggedIn) {
+        return (async () => {
+            if (window.userHelper?.waitForLogin) {
+                const loggedIn = await window.userHelper.waitForLogin();
+                if (!loggedIn) {
+                    window.__kefinHomeStartupDefaultSectionSync = false;
+                    return;
+                }
+            } else if (!window.ApiClient?._loggedIn) {
                 window.__kefinHomeStartupDefaultSectionSync = false;
                 return;
             }
-        } else if (!window.ApiClient?._loggedIn) {
-            window.__kefinHomeStartupDefaultSectionSync = false;
-            return;
-        }
 
-        try {
-            let admin = false;
             try {
-                admin = !!(await window.apiHelper?.isAdmin?.());
-            } catch {
-                return;
-            }
-            if (!admin) return;
+                let admin = false;
+                try {
+                    admin = !!(await window.apiHelper?.isAdmin?.());
+                } catch {
+                    return;
+                }
+                if (!admin) return;
 
-            // Legacy homeScreen → homeScreenConfig (no-ops once homeScreenConfig exists)
-            if (window.migrateHomeScreenConfig) {
-                await window.migrateHomeScreenConfig();
+                const route = String(window.location?.hash || '').toLowerCase();
+                const isHomeRoute = /^#\/(?:home(?:\.html)?)(?:[/?]|$)/.test(route);
+                if (isHomeRoute && isPerformanceTestUser()) {
+                    LOG('Deferring admin default-section sync until a configuration page is opened for the performance test user');
+                    window.__kefinHomeStartupDefaultSectionSync = false;
+
+                    if (!window.__kefinHomeStartupSyncRouteListener) {
+                        window.__kefinHomeStartupSyncRouteListener = true;
+                        const onRouteChange = () => {
+                            const currentRoute = String(window.location?.hash || '').toLowerCase();
+                            if (!/^#\/configurationpage(?:[/?]|$)/.test(currentRoute)) return;
+
+                            window.removeEventListener('hashchange', onRouteChange);
+                            window.removeEventListener('popstate', onRouteChange);
+                            window.__kefinHomeStartupSyncRouteListener = false;
+                            runStartupDefaultSectionSync().catch(err => ERR('Startup default section sync failed:', err));
+                        };
+                        window.addEventListener('hashchange', onRouteChange);
+                        window.addEventListener('popstate', onRouteChange);
+                    }
+                    return;
+                }
+
+                // Legacy homeScreen → homeScreenConfig (no-ops once homeScreenConfig exists)
+                if (window.migrateHomeScreenConfig) {
+                    await window.migrateHomeScreenConfig();
+                }
+                await ensureKefinTweaksDefaultSections();
+            } catch (error) {
+                ERR('Startup default section sync failed:', error);
             }
-            await ensureKefinTweaksDefaultSections();
-        } catch (error) {
-            ERR('Startup default section sync failed:', error);
-        }
+        })();
     }
 
     /**

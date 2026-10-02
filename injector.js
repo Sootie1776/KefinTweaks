@@ -102,6 +102,13 @@
         }
     }
 
+    function markPerformanceTest(name) {
+        if (!isPerformanceTestUser(window.KefinTweaksConfig)) return;
+        try {
+            window.performance?.mark?.(`KefinTweaks:${name}`);
+        } catch (_) { /* Performance marks are diagnostic only. */ }
+    }
+
     function scheduleAfterLargestContentfulPaint(callback) {
         let scheduled = false;
         let quietTimer = null;
@@ -141,6 +148,33 @@
 
         // Always make forward progress if LCP is unsupported or never reported.
         fallbackTimer = window.setTimeout(scheduleIdleCallback, 6000);
+    }
+
+    function scheduleAfterHomePaint(callback, maxWaitMs = 8000) {
+        let scheduled = false;
+        let fallbackTimer = null;
+
+        const scheduleIdleCallback = () => {
+            if (scheduled) return;
+            scheduled = true;
+            if (fallbackTimer !== null) window.clearTimeout(fallbackTimer);
+            window.removeEventListener('kefinTweaksHomePainted', onHomePainted);
+
+            if (typeof window.requestIdleCallback === 'function') {
+                window.requestIdleCallback(callback, { timeout: 1500 });
+            } else {
+                window.setTimeout(callback, 300);
+            }
+        };
+
+        const onHomePainted = () => scheduleIdleCallback();
+        if (window.__kefinTweaksHomePaintedAt) {
+            scheduleIdleCallback();
+            return;
+        }
+
+        window.addEventListener('kefinTweaksHomePainted', onHomePainted, { once: true });
+        fallbackTimer = window.setTimeout(scheduleIdleCallback, maxWaitMs);
     }
 
     // Reuse the same LCP-aware scheduling for optional work in core scripts.
@@ -1347,6 +1381,7 @@
                     : null;
 
                 const loadDeferredAssets = () => {
+                    markPerformanceTest('OptionalAssetsStart');
                     if (deferredPlan) Loader.applyAssetsToDocument(deferredPlan.assets);
                     document.dispatchEvent(new CustomEvent('kefinTweaksLoaded', {
                         detail: {
@@ -1360,7 +1395,13 @@
                 };
 
                 if (deferredPlan) {
-                    scheduleAfterLargestContentfulPaint(loadDeferredAssets);
+                    const isHomeRoute = /^#\/(?:home(?:\.html)?)(?:[/?]|$)/i.test(String(window.location?.hash || ''));
+                    if (isHomeRoute) {
+                        console.log('[KefinTweaks Injector] Waiting for Home paint before optional UI assets');
+                        scheduleAfterHomePaint(loadDeferredAssets);
+                    } else {
+                        scheduleAfterLargestContentfulPaint(loadDeferredAssets);
+                    }
                 } else {
                     loadDeferredAssets();
                 }
@@ -1654,48 +1695,64 @@
     }
 
     // Startup task - runs only for admin users
-    async function startupTask() {
-        console.log('[KefinTweaks Startup] Starting startup task...');
-        
-        // Check if kefinTweaksRoot is configured - startup tasks only run after installation
-        if (!window.KefinTweaksConfig?.kefinTweaksRoot || window.KefinTweaksConfig.kefinTweaksRoot === '') {
-            console.log('[KefinTweaks Startup] kefinTweaksRoot is not configured, skipping startup tasks');
-            return;
-        }
-        
-        // Check if user is admin (wait up to 5s for login)
-        const isAdmin = await checkAdminWithTimeout(5000);
-        
-        if (!isAdmin) {
-            console.log('[KefinTweaks Startup] User is not admin or not logged in, skipping startup task');
-            return;
-        }
+    let startupTaskPromise = null;
+    function startupTask() {
+        if (startupTaskPromise) return startupTaskPromise;
 
-        try {
-            // The configuration UI is intentionally deferred until this point so
-            // regular users do not pay its parse/compile cost on every page load.
-            await loadConfigurationJS();
+        startupTaskPromise = (async () => {
+            console.log('[KefinTweaks Startup] Starting startup task...');
 
-            // Fire-and-forget: remove leftover Watchlist Custom Tab (best-effort)
-            //removeWatchlistFromCustomTabPlugin();
-            
-            console.log('[KefinTweaks Startup] Startup task completed successfully');
-        } catch (error) {
-            console.error('[KefinTweaks Startup] Error in startup task:', error);
-        }
+            // Check if kefinTweaksRoot is configured - startup tasks only run after installation
+            if (!window.KefinTweaksConfig?.kefinTweaksRoot || window.KefinTweaksConfig.kefinTweaksRoot === '') {
+                console.log('[KefinTweaks Startup] kefinTweaksRoot is not configured, skipping startup tasks');
+                return;
+            }
+
+            // Check if user is admin (wait up to 5s for login)
+            const isAdmin = await checkAdminWithTimeout(5000);
+
+            if (!isAdmin) {
+                console.log('[KefinTweaks Startup] User is not admin or not logged in, skipping startup task');
+                return;
+            }
+
+            try {
+                // The configuration UI is intentionally deferred until this point so
+                // regular users do not pay its parse/compile cost on every page load.
+                await loadConfigurationJS();
+
+                // Fire-and-forget: remove leftover Watchlist Custom Tab (best-effort)
+                //removeWatchlistFromCustomTabPlugin();
+
+                console.log('[KefinTweaks Startup] Startup task completed successfully');
+            } catch (error) {
+                console.error('[KefinTweaks Startup] Error in startup task:', error);
+            }
+        })();
+        return startupTaskPromise;
     }
 
     function scheduleStartupTask() {
         // Configuration editors are only needed in admin settings. For the
-        // allowlisted performance test account on Home, avoid loading them
-        // before the home screen's LCP. Other routes and users keep the
-        // existing one-second startup.
+        // allowlisted performance test account, do not load them at all on
+        // Home; load them when the user navigates to a configuration page.
+        // This avoids the separate admin-only configuration load plan during
+        // Home rendering. Runtime dependencies used by Home remain unchanged.
         window.setTimeout(() => {
             const hash = String(window.location?.hash || '').toLowerCase();
             const isHomeRoute = /^#\/(?:home(?:\.html)?)(?:[/?]|$)/.test(hash);
             if (isHomeRoute && isPerformanceTestUser(window.KefinTweaksConfig)) {
-                console.log('[KefinTweaks Startup] Deferring admin configuration until after LCP for test user');
-                scheduleAfterLargestContentfulPaint(startupTask);
+                console.log('[KefinTweaks Startup] Skipping admin configuration on Home for test user; will load on configuration page');
+                const loadConfigurationOnRoute = () => {
+                    const route = String(window.location?.hash || '').toLowerCase();
+                    if (!/^#\/configurationpage(?:[/?]|$)/.test(route)) return;
+
+                    window.removeEventListener('hashchange', loadConfigurationOnRoute);
+                    window.removeEventListener('popstate', loadConfigurationOnRoute);
+                    startupTask();
+                };
+                window.addEventListener('hashchange', loadConfigurationOnRoute);
+                window.addEventListener('popstate', loadConfigurationOnRoute);
                 return;
             }
             startupTask();

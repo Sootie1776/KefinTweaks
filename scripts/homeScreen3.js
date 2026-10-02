@@ -1211,6 +1211,10 @@
             if (!state.homePaintedEventFired) {
                 state.homePaintedEventFired = true;
                 try {
+                    window.__kefinTweaksHomePaintedAt = Date.now();
+                    if (isPerformanceTestUser()) {
+                        window.performance?.mark?.('KefinTweaks:HomePainted');
+                    }
                     document.dispatchEvent(new CustomEvent('kefinTweaksHomePainted'));
                 } catch (_) { /* ignore */ }
             }
@@ -2239,4 +2243,3 @@
     } */
 
 })();
-
