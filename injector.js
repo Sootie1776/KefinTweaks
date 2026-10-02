@@ -250,7 +250,9 @@
             name: 'homeScreen-user-configuration',
             script: '../configuration/homeScreen-user-configuration.js',
             css: null,
-            dependencies: ['ui', 'utils'],
+            // The user configuration module calls KefinHomeScreen.getSections
+            // during its initial page hookup, so load the provider first.
+            dependencies: ['ui', 'utils', 'homeScreen-configuration'],
             description: 'User home screen section preferences and bulk order editor'
         },
         {
