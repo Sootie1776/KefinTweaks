@@ -1211,8 +1211,8 @@
             if (!state.homePaintedEventFired) {
                 state.homePaintedEventFired = true;
                 try {
-                    window.__kefinTweaksHomePaintedAt = Date.now();
                     if (isPerformanceTestUser()) {
+                        window.__kefinTweaksHomePaintedAt = Date.now();
                         window.performance?.mark?.('KefinTweaks:HomePainted');
                     }
                     document.dispatchEvent(new CustomEvent('kefinTweaksHomePainted'));
