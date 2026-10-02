@@ -1824,7 +1824,7 @@
         const token = apiClient.accessToken();
         const userId = apiClient.getCurrentUserId();
         const cache = new window.LocalStorageCache();
-        const indexedDBCache = new window.IndexedDBCache();
+        const indexedDBCache = window.IndexedDBCache;
         
         try {
             LOG('Starting paginated fetch of movies for people data processing...');
@@ -2107,47 +2107,40 @@
             return;
         }
         
-        const indexedDBCache = new window.IndexedDBCache();
+        const indexedDBCache = window.IndexedDBCache;
         const apiClient = window.ApiClient;
         const userId = apiClient.getCurrentUserId();
         
-        // First, check if we have valid complete filtered data (in IndexedDBCache)
-        if (await indexedDBCache.isCacheValid('movies_top_people', userId)) {
-            const cachedData = await indexedDBCache.get('movies_top_people', userId);
-            
-            // Check if data is complete
-            if (cachedData && cachedData.isComplete) {
-                moviesTopPeople = cachedData;
-                isPeopleCacheComplete = true;
-                LOG('Loaded complete top people data from IndexedDB cache');
-                return;
-            }
+        // get() checks the TTL while reading, avoiding a separate validity read.
+        const cachedData = await indexedDBCache.get('movies_top_people', userId);
+        if (cachedData && cachedData.isComplete) {
+            moviesTopPeople = cachedData;
+            isPeopleCacheComplete = true;
+            LOG('Loaded complete top people data from IndexedDB cache');
+            return;
         }
         
         // If no complete data, check for raw partial data (in IndexedDBCache)
-        if (await indexedDBCache.isCacheValid('movies_top_people_raw', userId)) {
-            const rawCachedData = await indexedDBCache.get('movies_top_people_raw', userId);
-            
-            if (rawCachedData && rawCachedData.peopleData) {
-                // Reconstruct Map and filter for immediate display
-                const peopleMap = new Map(rawCachedData.peopleData);
-                const filteredData = filterPeopleData(peopleMap);
-                
-                if (filteredData) {
-                    moviesTopPeople = filteredData;
-                    isPeopleCacheComplete = rawCachedData.isComplete || false;
-                    LOG(`Loaded partial top people data from raw cache (${rawCachedData.moviesProcessedCount || 0} movies), ${filteredData.actors.length} actors, ${filteredData.directors.length} directors, ${filteredData.writers.length} writers`);
-                    
-                    // If incomplete, we'll continue fetching in background
-                    if (!isPeopleCacheComplete) {
-                        // Continue in background
-                    } else {
-                        // It's marked complete but wasn't in filtered cache, update filtered cache
-                        filteredData.isComplete = true;
-                        await indexedDBCache.set('movies_top_people', filteredData, userId, 7 * 24 * 60 * 60 * 1000);
-                        await indexedDBCache.clear('movies_top_people_raw', userId);
-                        return;
-                    }
+        const rawCachedData = await indexedDBCache.get('movies_top_people_raw', userId);
+        if (rawCachedData && rawCachedData.peopleData) {
+            // Reconstruct Map and filter for immediate display
+            const peopleMap = new Map(rawCachedData.peopleData);
+            const filteredData = filterPeopleData(peopleMap);
+
+            if (filteredData) {
+                moviesTopPeople = filteredData;
+                isPeopleCacheComplete = rawCachedData.isComplete || false;
+                LOG(`Loaded partial top people data from raw cache (${rawCachedData.moviesProcessedCount || 0} movies), ${filteredData.actors.length} actors, ${filteredData.directors.length} directors, ${filteredData.writers.length} writers`);
+
+                // If incomplete, we'll continue fetching in background
+                if (!isPeopleCacheComplete) {
+                    // Continue in background
+                } else {
+                    // It's marked complete but wasn't in filtered cache, update filtered cache
+                    filteredData.isComplete = true;
+                    await indexedDBCache.set('movies_top_people', filteredData, userId, 7 * 24 * 60 * 60 * 1000);
+                    await indexedDBCache.clear('movies_top_people_raw', userId);
+                    return;
                 }
             }
         }

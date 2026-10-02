@@ -126,10 +126,6 @@
 
         // Get cached data if valid
         async get(cacheName, userId = null) {
-            if (!(await this.isCacheValid(cacheName, userId))) {
-                return null;
-            }
-            
             const key = this.getCacheKey(cacheName, userId);
             
             try {
@@ -141,7 +137,14 @@
                 return new Promise((resolve) => {
                     request.onsuccess = () => {
                         const data = request.result;
-                        resolve(data ? data.payload : null);
+                        if (!data) {
+                            resolve(null);
+                            return;
+                        }
+
+                        const ttl = data.ttl || this.ttl;
+                        const isValid = (Date.now() - data.timestamp) < ttl;
+                        resolve(isValid ? data.payload : null);
                     };
                     
                     request.onerror = () => {
@@ -273,4 +276,3 @@
     LOG('IndexedDBCache manager loaded');
     
 })();
-

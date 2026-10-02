@@ -747,52 +747,51 @@
             try {
                 const cache = window.IndexedDBCache;
                 const userId = window.ApiClient.getCurrentUserId();
-                if (cache && await cache.isCacheValid(CACHE_NAME, userId)) {
-                    const cached = await cache.get(CACHE_NAME, userId);
-                    if (cached?.isComplete && Array.isArray(cached.peopleData)) {
-                        const currentMode = shouldLoadPeopleEpisodeData();
-                        const cachedMode = typeof cached.loadPeopleEpisodeData === 'boolean'
-                            ? cached.loadPeopleEpisodeData
-                            : false;
-                        if (cachedMode !== currentMode) {
-                            LOG(`People cache episode mode mismatch (cached=${cachedMode}, current=${currentMode}); rebuilding`);
-                            await cache.clear?.(CACHE_NAME, userId);
+                // get() validates the TTL from the same IndexedDB row it returns.
+                const cached = cache ? await cache.get(CACHE_NAME, userId) : null;
+                if (cached?.isComplete && Array.isArray(cached.peopleData)) {
+                    const currentMode = shouldLoadPeopleEpisodeData();
+                    const cachedMode = typeof cached.loadPeopleEpisodeData === 'boolean'
+                        ? cached.loadPeopleEpisodeData
+                        : false;
+                    if (cachedMode !== currentMode) {
+                        LOG(`People cache episode mode mismatch (cached=${cachedMode}, current=${currentMode}); rebuilding`);
+                        await cache.clear?.(CACHE_NAME, userId);
+                    } else {
+                        peopleMap = new Map(cached.peopleData);
+                        episodePeopleWatermark = cached.episodePeopleWatermark || null;
+                        lastEpisodeSyncAt = cached.lastEpisodeSyncAt || null;
+                        if (cached.episodeCrawl
+                            && typeof cached.episodeCrawl === 'object'
+                            && cached.episodePeopleComplete !== true) {
+                            episodeCrawl = {
+                                startIndex: Math.max(0, Number(cached.episodeCrawl.startIndex) || 0),
+                                newestAt: cached.episodeCrawl.newestAt || null,
+                                oldestApplied: cached.episodeCrawl.oldestApplied || null
+                            };
+                            episodePeopleComplete = false;
                         } else {
-                            peopleMap = new Map(cached.peopleData);
-                            episodePeopleWatermark = cached.episodePeopleWatermark || null;
-                            lastEpisodeSyncAt = cached.lastEpisodeSyncAt || null;
-                            if (cached.episodeCrawl
-                                && typeof cached.episodeCrawl === 'object'
-                                && cached.episodePeopleComplete !== true) {
-                                episodeCrawl = {
-                                    startIndex: Math.max(0, Number(cached.episodeCrawl.startIndex) || 0),
-                                    newestAt: cached.episodeCrawl.newestAt || null,
-                                    oldestApplied: cached.episodeCrawl.oldestApplied || null
-                                };
-                                episodePeopleComplete = false;
-                            } else {
-                                clearEpisodeCrawl();
-                                episodePeopleComplete = cached.episodePeopleComplete === true
-                                    || !currentMode;
-                            }
-                            const before = peopleMap.size;
-                            // Avoid pruning away mid-crawl people that only meet mins after more pages
-                            if (episodePeopleComplete) {
-                                prunePeopleMap(peopleMap);
-                            }
-                            isComplete = true;
-                            rebuildFilteredLists();
-                            LOG('Loaded people cache from IndexedDB'
-                                + (episodeCrawl ? ` (partial episode crawl startIndex=${episodeCrawl.startIndex})` : ''));
-                            if (episodePeopleComplete && peopleMap.size < before) {
-                                await persistPeople({ prune: true });
-                            }
-                            if (currentMode) {
-                                // Resume partial, incremental watermark, or start full — never wipe on missing watermark alone
-                                scheduleEpisodePeopleSync();
-                            }
-                            return;
+                            clearEpisodeCrawl();
+                            episodePeopleComplete = cached.episodePeopleComplete === true
+                                || !currentMode;
                         }
+                        const before = peopleMap.size;
+                        // Avoid pruning away mid-crawl people that only meet mins after more pages
+                        if (episodePeopleComplete) {
+                            prunePeopleMap(peopleMap);
+                        }
+                        isComplete = true;
+                        rebuildFilteredLists();
+                        LOG('Loaded people cache from IndexedDB'
+                            + (episodeCrawl ? ` (partial episode crawl startIndex=${episodeCrawl.startIndex})` : ''));
+                        if (episodePeopleComplete && peopleMap.size < before) {
+                            await persistPeople({ prune: true });
+                        }
+                        if (currentMode) {
+                            // Resume partial, incremental watermark, or start full — never wipe on missing watermark alone
+                            scheduleEpisodePeopleSync();
+                        }
+                        return;
                     }
                 }
                 await fetchAndCachePeople();
