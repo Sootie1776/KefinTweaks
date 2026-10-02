@@ -25,4 +25,4 @@ script.async = true;
 document.head.appendChild(script);
 ```
 
-It loads the runtime injector immediately and defers the larger installer to administrators during idle time. The installer remains available for admin configuration, while regular users avoid parsing it on every page.
+It loads the runtime injector immediately. For the privately allowlisted performance-test account, the larger admin installer is loaded only when that administrator opens Dashboard → Plugins, where its KefinTweaks card is used. All other accounts retain their existing behavior until the change is validated.

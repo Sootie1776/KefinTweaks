@@ -58,6 +58,22 @@
         }
     }
 
+    function isPerformanceTestUser() {
+        try {
+            const userId = String(window.ApiClient?.getCurrentUserId?.() || '');
+            if (!userId) return false;
+
+            const configured = window.KefinTweaksConfig?.performanceTestUserIds
+                || window.__KefinTweaksPerformanceTestUsers;
+            const userIds = configured instanceof Set
+                ? configured
+                : new Set(Array.isArray(configured) ? configured.map(String) : []);
+            return userIds.has(userId);
+        } catch (_) {
+            return false;
+        }
+    }
+
     async function waitForAdmin(maxWaitMs = 8000) {
         const started = Date.now();
         while (Date.now() - started < maxWaitMs) {
@@ -74,18 +90,53 @@
         return false;
     }
 
+    function isPluginsRoute() {
+        return /^#\/dashboard\/plugins(?:[/?]|$)/i.test(String(window.location?.hash || ''));
+    }
+
+    let installerLoadPromise = null;
+    async function loadInstallerOnPluginsRoute() {
+        if (!isPluginsRoute() || installerLoadPromise) return installerLoadPromise;
+
+        installerLoadPromise = (async () => {
+            if (!(await waitForAdmin())) return;
+            // Jellyfin is an SPA; the admin may navigate away while the session
+            // is being restored. Avoid loading the installer after leaving its UI.
+            if (!isPluginsRoute()) return;
+            try {
+                await loadScript(`${root}kefinTweaks-plugin.js`);
+                console.log('[KefinTweaks Runtime] Admin installer loaded on Plugins page');
+            } catch (error) {
+                console.warn('[KefinTweaks Runtime] Deferred admin installer failed:', error);
+            }
+        })().finally(() => {
+            installerLoadPromise = null;
+        });
+
+        return installerLoadPromise;
+    }
+
     // Runtime code is the critical path. The installer is optional and deferred.
     loadScript(`${root}injector.js`).catch((error) => {
         console.error('[KefinTweaks Runtime] Failed to load injector:', error);
     });
 
-    schedule(async () => {
-        if (!(await waitForAdmin())) return;
-        try {
-            await loadScript(`${root}kefinTweaks-plugin.js`);
-            console.log('[KefinTweaks Runtime] Deferred admin installer loaded');
-        } catch (error) {
-            console.warn('[KefinTweaks Runtime] Deferred admin installer failed:', error);
-        }
-    });
+    if (isPerformanceTestUser()) {
+        // The installer only adds the KefinTweaks card to Dashboard → Plugins.
+        // Keep this experiment account-scoped until traces confirm the benefit.
+        window.addEventListener('hashchange', loadInstallerOnPluginsRoute);
+        window.addEventListener('popstate', loadInstallerOnPluginsRoute);
+        loadInstallerOnPluginsRoute();
+    } else {
+        // Preserve the existing behavior for all other accounts.
+        schedule(async () => {
+            if (!(await waitForAdmin())) return;
+            try {
+                await loadScript(`${root}kefinTweaks-plugin.js`);
+                console.log('[KefinTweaks Runtime] Deferred admin installer loaded');
+            } catch (error) {
+                console.warn('[KefinTweaks Runtime] Deferred admin installer failed:', error);
+            }
+        });
+    }
 })();

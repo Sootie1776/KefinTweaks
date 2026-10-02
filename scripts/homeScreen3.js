@@ -6,6 +6,22 @@
     const WARN = (...args) => console.warn('[KefinTweaks HomeScreen3]', ...args);
     const ERR = (...args) => console.error('[KefinTweaks HomeScreen3]', ...args);
 
+    function isPerformanceTestUser() {
+        try {
+            const userId = String(window.ApiClient?.getCurrentUserId?.() || '');
+            if (!userId) return false;
+
+            const configured = window.KefinTweaksConfig?.performanceTestUserIds
+                || window.__KefinTweaksPerformanceTestUsers;
+            const userIds = configured instanceof Set
+                ? configured
+                : new Set(Array.isArray(configured) ? configured.map(String) : []);
+            return userIds.has(userId);
+        } catch (_) {
+            return false;
+        }
+    }
+
     // Configuration
     const PRE_FETCH_DISCOVERY_DATA = false; // If true, fetches first discovery group immediately. If false, waits for scroll/click.
 

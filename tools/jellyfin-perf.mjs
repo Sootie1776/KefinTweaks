@@ -327,9 +327,13 @@ async function readTrace(file) {
   const imageTotals = new Map();
   let imageBytes = 0;
   let imageCount = 0;
+  const imageCache = { fromCache: 0, fromServiceWorker: 0, network: 0 };
   for (const [requestId, request] of requests) {
     const response = responses.get(requestId);
     if (!(response?.mimeType || '').startsWith('image/')) continue;
+    if (response.fromCache) imageCache.fromCache += 1;
+    else if (response.fromServiceWorker) imageCache.fromServiceWorker += 1;
+    else imageCache.network += 1;
     const bytes = finishes.get(requestId)?.encodedDataLength || 0;
     let imagePath = 'unknown';
     try {
@@ -376,6 +380,7 @@ async function readTrace(file) {
     images: {
       requestCount: imageCount,
       transferredKB: Math.round(imageBytes / 1024),
+      cacheSources: imageCache,
       largestPaths: [...imageTotals].sort((a, b) => b[1].bytes - a[1].bytes).slice(0, 5).map(([imagePath, value]) => ({
         path: imagePath,
         requestCount: value.count,
@@ -411,6 +416,7 @@ async function compare(baselinePath, testPath) {
       optionalAssetsStart: delta('optionalAssetsStartMs'),
       kefinFirstRequest: delta('kefinTweaks.firstRequestMs'),
       imageTransferKB: delta('images.transferredKB'),
+      imageCacheHits: delta('images.cacheSources.fromCache'),
       mainThreadLongTaskTotal: delta('mainThreadLongTasks.totalMs'),
     },
     note: 'Negative is faster. Check recording-window consistency. LCP is only valid when both traces include meaningful Home content; compare candidate count/node/size too.',
