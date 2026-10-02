@@ -13,3 +13,16 @@ The `experimental` branch may contain account-scoped performance experiments and
 - The fork uses `Sootie1776/KefinTweaks` for its own CDN and GitHub API lookups.
 - The normal KefinTweaks feature documentation remains upstream.
 - Do not use this fork as a drop-in replacement unless you understand the changes in the selected commit.
+
+## Faster runtime bootstrap
+
+After the fork is installed and the `KefinTweaks-Config` entry exists in JavaScript Injector, use the small runtime bootstrap for normal page loads:
+
+```javascript
+const script = document.createElement('script');
+script.src = 'https://cdn.jsdelivr.net/gh/Sootie1776/KefinTweaks@performance-test-user-gate/kefinTweaks-runtime.js';
+script.async = true;
+document.head.appendChild(script);
+```
+
+It loads the runtime injector immediately and defers the larger installer to administrators during idle time. The installer remains available for admin configuration, while regular users avoid parsing it on every page.

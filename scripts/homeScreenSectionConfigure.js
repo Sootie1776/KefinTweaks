@@ -5,6 +5,70 @@
     const LOG = (...args) => console.log('[KefinTweaks HomeSectionConfigure]', ...args);
     const WARN = (...args) => console.warn('[KefinTweaks HomeSectionConfigure]', ...args);
 
+    let pickrLoadPromise = null;
+
+    function getPickrAssetUrls() {
+        const config = window.KefinTweaksConfig || {};
+        const root = config.kefinTweaksRootResolved || config.kefinTweaksRoot || '';
+        if (!root) return null;
+
+        const resolve = window.KefinTweaksLoader?.resolveAssetUrl;
+        if (resolve) {
+            return {
+                css: resolve(root, 'thirdparty/pickr/pickr-nano.min.css'),
+                js: resolve(root, 'thirdparty/pickr/pickr.min.js')
+            };
+        }
+
+        const base = String(root).replace(/\/$/, '');
+        return {
+            css: `${base}/scripts/thirdparty/pickr/pickr-nano.min.css`,
+            js: `${base}/scripts/thirdparty/pickr/pickr.min.js`
+        };
+    }
+
+    function ensurePickrLoaded() {
+        if (typeof window.Pickr?.create === 'function') return Promise.resolve(true);
+        if (pickrLoadPromise) return pickrLoadPromise;
+
+        const urls = getPickrAssetUrls();
+        if (!urls) return Promise.resolve(false);
+
+        const existingCss = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
+            .some((link) => link.href === urls.css || link.href.startsWith(`${urls.css}?`));
+        if (!existingCss) {
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.type = 'text/css';
+            link.href = urls.css;
+            document.head.appendChild(link);
+        }
+
+        pickrLoadPromise = new Promise((resolve) => {
+            const existingScript = Array.from(document.scripts || []).find((script) => {
+                return script.src === urls.js || script.src.startsWith(`${urls.js}?`);
+            });
+            if (existingScript) {
+                existingScript.addEventListener('load', () => resolve(typeof window.Pickr?.create === 'function'), { once: true });
+                existingScript.addEventListener('error', () => resolve(false), { once: true });
+                if (typeof window.Pickr?.create === 'function') resolve(true);
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = urls.js;
+            script.async = true;
+            script.onload = () => resolve(typeof window.Pickr?.create === 'function');
+            script.onerror = () => {
+                WARN('Pickr failed to load:', urls.js);
+                resolve(false);
+            };
+            document.head.appendChild(script);
+        });
+
+        return pickrLoadPromise;
+    }
+
     const runtime = new Map();
     let activePopover = null;
     let saveTimeout = null;
@@ -1212,8 +1276,9 @@
                 };
 
                 // Lazy-init Pickr on first swatch click so opening the menu never depends on Pickr layout.
-                const ensureBorderPickr = () => {
+                const ensureBorderPickr = async () => {
                     if (borderPickr || !colorSwatch) return borderPickr;
+                    if (!(await ensurePickrLoaded())) return null;
                     borderPickr = createPickrInstance(colorSwatch, {
                         defaultColor: colorValue,
                         useAsButton: true,
@@ -1234,11 +1299,11 @@
                     return borderPickr;
                 };
 
-                colorSwatch?.addEventListener('click', (ev) => {
+                colorSwatch?.addEventListener('click', async (ev) => {
                     ev.stopPropagation();
                     if (colorSwatch.disabled) return;
                     if (!borderPickr) {
-                        const pickr = ensureBorderPickr();
+                        const pickr = await ensureBorderPickr();
                         // Same-event listeners added by Pickr won't run; open on next frame.
                         requestAnimationFrame(() => pickr?.show());
                     }
@@ -1398,8 +1463,9 @@
                 };
 
                 // Lazy-init on click — creating Pickr during onOpen was breaking the popover.
-                const ensureTitlePickr = () => {
+                const ensureTitlePickr = async () => {
                     if (titlePickr || !colorBtn) return titlePickr;
+                    if (!(await ensurePickrLoaded())) return null;
                     titlePickr = createPickrInstance(colorBtn, {
                         defaultColor: titleColor,
                         useAsButton: true,
@@ -1436,12 +1502,12 @@
                     applyTitleChange();
                 });
 
-                colorBtn?.addEventListener('click', (ev) => {
+                colorBtn?.addEventListener('click', async (ev) => {
                     ev.stopPropagation();
                     closeActiveFormatMenu();
                     if (colorBtn.disabled) return;
                     if (!titlePickr) {
-                        const pickr = ensureTitlePickr();
+                        const pickr = await ensureTitlePickr();
                         requestAnimationFrame(() => pickr?.show());
                     }
                     // After init, Pickr's useAsButton handler toggles open/close.

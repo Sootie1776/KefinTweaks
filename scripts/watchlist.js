@@ -1,7 +1,7 @@
 // Jellyfin Watchlist Script
 // Adds watchlist functionality throughout Jellyfin interface
 // Requires: cardBuilder.js, localStorageCache.js, modal.js, utils.js, statistics.js modules to be loaded before this script
-// Chart.js is loaded as a thirdParty dependency of watchlist
+// Chart.js is loaded on demand when the Statistics tab is rendered.
 // Requirement #2: Custom Tabs plugin
 /* 
 In the Custom Tabs plugin, add a new tab with the following HTML content:
@@ -5710,7 +5710,7 @@ In the Custom Tabs plugin, add a new tab with the following HTML content:
 				});
 
 				if (window.KefinWatchlistStats && typeof window.KefinWatchlistStats.render === 'function') {
-					window.KefinWatchlistStats.render(statisticsTab, {
+					await window.KefinWatchlistStats.render(statisticsTab, {
 						progress: progressCache.data,
 						movies: movieCache.data
 					});
@@ -8260,4 +8260,3 @@ In the Custom Tabs plugin, add a new tab with the following HTML content:
 
     LOG('Initialized successfully');
 })();
-

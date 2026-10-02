@@ -703,7 +703,7 @@ window.KefinTweaksConfig = ${JSON.stringify(config, null, 2)};`;
                 <p>Thanks so much for installing KefinTweaks!</p>
                 <p>KefinTweaks is not maintained by the Jellyfin team, and as a result you are encouraged to seek support from me directly.</p>
                 <p>Sadly, there is <i>currently</i> no place suitable for discussion of plugins built by community members or fan-made projects in the official Jellyfin Discord, so please visit the <a href="https://discord.gg/v7P9CAvCKZ" target="_blank" style="color: #00a4dc; text-decoration: underline;">Jellyfin Community Discord</a> to find me (username: HighImKevin) and other users who would be happy to help you out.</p>
-                <p>Please also feel free to report bugs and request features from the <a href="https://github.com/ranaldsgift/KefinTweaks/issues" target="_blank" style="color: #00a4dc; text-decoration: underline;">Issues</a> page. The strength of this plugin relies on awesome community members like you, so thanks for using KefinTweaks!</p>
+                <p>Please also feel free to report bugs and request features from the <a href="https://github.com/Sootie1776/KefinTweaks/issues" target="_blank" style="color: #00a4dc; text-decoration: underline;">Issues</a> page. The strength of this plugin relies on awesome community members like you, so thanks for using KefinTweaks!</p>
             `;
         } else {
             // Update message with refresh instruction

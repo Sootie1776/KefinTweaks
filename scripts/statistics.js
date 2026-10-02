@@ -43,6 +43,51 @@
 
     /** @type {import('chart.js').Chart[]} */
     let chartInstances = [];
+    let chartLoadPromise = null;
+
+    function getChartAssetUrl() {
+        const config = window.KefinTweaksConfig || {};
+        const root = config.kefinTweaksRootResolved || config.kefinTweaksRoot || '';
+        if (!root) return null;
+
+        if (window.KefinTweaksLoader?.resolveAssetUrl) {
+            return window.KefinTweaksLoader.resolveAssetUrl(root, 'thirdparty/chartjs/chart.js');
+        }
+
+        return `${String(root).replace(/\/$/, '')}/scripts/thirdparty/chartjs/chart.js`;
+    }
+
+    function ensureChartJs() {
+        if (window.Chart) return Promise.resolve(true);
+        if (chartLoadPromise) return chartLoadPromise;
+
+        const url = getChartAssetUrl();
+        if (!url) return Promise.resolve(false);
+
+        chartLoadPromise = new Promise((resolve) => {
+            const existing = Array.from(document.scripts || []).find((script) => {
+                return script.src === url || script.src.startsWith(`${url}?`);
+            });
+            if (existing) {
+                existing.addEventListener('load', () => resolve(!!window.Chart), { once: true });
+                existing.addEventListener('error', () => resolve(false), { once: true });
+                if (window.Chart) resolve(true);
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = url;
+            script.async = true;
+            script.onload = () => resolve(!!window.Chart);
+            script.onerror = () => {
+                WARN('Chart.js failed to load:', url);
+                resolve(false);
+            };
+            document.head.appendChild(script);
+        });
+
+        return chartLoadPromise;
+    }
 
     function ticksToMs(ticks) {
         return (Number(ticks) || 0) / TICKS_PER_MS;
@@ -935,7 +980,7 @@
         `).join('');
     }
 
-    function render(root, { progress, movies } = {}) {
+    async function render(root, { progress, movies } = {}) {
         if (!root) {
             WARN('render called without root');
             return;
@@ -957,7 +1002,8 @@
         lastActivityEvents = events;
         overTimeChartRoot = root;
 
-        if (!window.Chart) {
+        const chartReady = await ensureChartJs();
+        if (!chartReady) {
             WARN('Chart.js not available; skipping charts');
         } else {
             renderOverTimeChart(root, events);

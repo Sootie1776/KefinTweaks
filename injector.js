@@ -1158,22 +1158,48 @@
         return window.KefinTweaksLoader;
     }
 
+    let configurationLoadPromise = null;
+
+    // Configuration editors are an admin-only surface. Keep their dependency graph
+    // out of normal startup and load it once, on demand, after admin status is known.
     async function loadConfigurationJS() {
-        const configDependencyNames = ['modal', 'toaster', 'utils', 'homeScreenConfig2', 'ui', 'homeScreen-migration', 'homeScreen-configuration', 'search-configuration', 'seriesEpisodes-configuration', 'seriesInfo-configuration', 'versionPreferences-configuration', 'skinManager-configuration', 'customMenuLinks-configuration', 'thumbnailScrubber-configuration', 'watchTogether-configuration', 'userManager-configuration', 'apiHelper', 'sectionHelper'];
-        for (const depName of configDependencyNames) {
-            const depScript = SCRIPT_DEFINITIONS.find(script => script.name === depName);
-            if (depScript) {
-                try {
-                    await loadScriptSync(depScript);
-                } catch (error) {
-                    console.warn(`[KefinTweaks Injector] Failed to load configuration dependency '${depName}':`, error);
-                }
+        if (configurationLoadPromise) return configurationLoadPromise;
+
+        configurationLoadPromise = (async () => {
+            const Loader = window.KefinTweaksLoader;
+            if (!Loader) {
+                throw new Error('KefinTweaksLoader is not available');
             }
-        }
-        
-        // Load configuration UI so admins can re-enable KefinTweaks
-        await loadScript('configuration.js');
-        await loadCSS('configuration.css');
+
+            const config = window.KefinTweaksConfig || {};
+            const majorVersion = await window.KefinTweaks.getJellyfinMajorVersion();
+            const root = Loader.getResolvedKefinRoot
+                ? Loader.getResolvedKefinRoot(config)
+                : Loader.normalizeRoot(config.kefinTweaksRoot || '');
+
+            const plan = Loader.buildLoadPlan(config, majorVersion, {
+                root,
+                urlSuffix,
+                configOnly: true,
+                includeConfiguration: true
+            });
+
+            Loader.applyAssetsToDocument(plan.assets);
+            document.dispatchEvent(new CustomEvent('kefinTweaksConfigurationLoaded', {
+                detail: {
+                    loadedScripts: plan.scriptNames,
+                    stamp: plan.stamp,
+                    timestamp: new Date().toISOString()
+                }
+            }));
+            console.log('[KefinTweaks Injector] Deferred admin configuration assets:', plan.assets.length);
+            return plan;
+        })().catch((error) => {
+            configurationLoadPromise = null;
+            throw error;
+        });
+
+        return configurationLoadPromise;
     }
     
     // Main initialization: live load plan (fills gaps vs baked preload) + stamp sync
@@ -1207,7 +1233,8 @@
             const plan = Loader.buildLoadPlan(config, majorVersion, {
                 root,
                 urlSuffix,
-                configOnly: config.enabled === false
+                configOnly: config.enabled === false,
+                includeConfiguration: false
             });
             console.log('[KefinTweaks Injector] Applying ordered assets:', plan.assets.length, 'stamp=', plan.stamp);
             // Dedupe against tags already injected by baked KefinTweaks-injector
@@ -1528,6 +1555,10 @@
         }
 
         try {
+            // The configuration UI is intentionally deferred until this point so
+            // regular users do not pay its parse/compile cost on every page load.
+            await loadConfigurationJS();
+
             // Fire-and-forget: remove leftover Watchlist Custom Tab (best-effort)
             //removeWatchlistFromCustomTabPlugin();
             

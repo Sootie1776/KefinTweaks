@@ -113,7 +113,6 @@
             script: 'homeScreenSectionConfigure.js',
             css: null,
             dependencies: ['homeScreen-user-configuration', 'modal', 'ui', 'cardBuilder'],
-            thirdParty: ['pickr'],
             description: 'Inline configure popover for user home screen sections'
         },
         {
@@ -389,14 +388,13 @@
             script: 'watchlist.js',
             css: 'watchlist.css',
             dependencies: ['cardBuilder', 'localStorageCache', 'modal', 'utils', 'statistics', 'watchlist-configuration'],
-            thirdParty: ['chartjs'],
             description: 'Adds watchlist functionality throughout Jellyfin interface'
         },
         {
             name: 'homeScreen',
             script: 'homeScreen3.js',
             css: 'homeScreen.css',
-            dependencies: ['cardBuilder', 'localStorageCache', 'utils', 'userHelper', 'homeScreenConfig2', 'homeScreen-configuration', 'peopleCache', 'studiosCache', 'moviesCache', 'seriesCache', 'libraryCache', 'libraryCacheUtils', 'externalList', 'indexedDBCache', 'homeScreenConfigCommunity', 'dataHelper', 'apiHelper', 'sectionHelper', 'homeScreen-migration', 'homeScreen-user-configuration', 'homeScreenSectionConfigure', 'homeScreenPin'],
+            dependencies: ['cardBuilder', 'localStorageCache', 'utils', 'userHelper', 'homeScreenConfig2', 'peopleCache', 'studiosCache', 'moviesCache', 'seriesCache', 'libraryCache', 'libraryCacheUtils', 'externalList', 'indexedDBCache', 'homeScreenConfigCommunity', 'dataHelper', 'apiHelper', 'sectionHelper', 'homeScreen-migration', 'homeScreen-user-configuration', 'homeScreenSectionConfigure', 'homeScreenPin'],
             priority: true, // Load immediately after dependencies to reduce UI disruption
             description: 'Adds custom home screen sections'
         },
@@ -785,12 +783,13 @@
         const byName = definitionsByName();
         const enabled = mergeEnabledScripts(config);
         const featuresDisabled = (config && config.enabled === false) || options.configOnly === true;
+        // Configuration editors are large and are not needed to render normal Jellyfin
+        // pages. Keep them out of the startup plan and load them on demand for admins.
+        // configOnly remains available for the explicit admin/configuration load path.
+        const includeConfiguration = options.includeConfiguration === true;
 
-        let scriptNames;
-        if (featuresDisabled) {
-            scriptNames = buildConfigScriptList(enabled, majorVersion, byName);
-        } else {
-            scriptNames = buildOrderedScriptList(enabled, majorVersion, byName);
+        let scriptNames = featuresDisabled ? [] : buildOrderedScriptList(enabled, majorVersion, byName);
+        if (includeConfiguration) {
             const configNames = buildConfigScriptList(enabled, majorVersion, byName);
             configNames.forEach((n) => {
                 if (!scriptNames.includes(n)) scriptNames.push(n);
@@ -814,25 +813,27 @@
             pushAssets(expandScriptToAssets(def, root, urlSuffix, THIRD_PARTY_SCRIPTS));
         });
 
-        pushAssets([
-            {
-                kind: 'css',
-                url: resolveAssetUrl(root, CONFIGURATION_FILES.css) + urlSuffix,
-                path: CONFIGURATION_FILES.css,
-                name: 'configuration'
-            },
-            {
-                kind: 'js',
-                url: resolveAssetUrl(root, CONFIGURATION_FILES.script) + urlSuffix,
-                path: CONFIGURATION_FILES.script,
-                name: 'configuration'
-            }
-        ]);
+        if (includeConfiguration) {
+            pushAssets([
+                {
+                    kind: 'css',
+                    url: resolveAssetUrl(root, CONFIGURATION_FILES.css) + urlSuffix,
+                    path: CONFIGURATION_FILES.css,
+                    name: 'configuration'
+                },
+                {
+                    kind: 'js',
+                    url: resolveAssetUrl(root, CONFIGURATION_FILES.script) + urlSuffix,
+                    path: CONFIGURATION_FILES.script,
+                    name: 'configuration'
+                }
+            ]);
+        }
 
         const stamp = [
             root,
             String(majorVersion == null ? 'unknown' : majorVersion),
-            featuresDisabled ? 'config-only' : 'full',
+            includeConfiguration ? 'with-config' : (featuresDisabled ? 'disabled' : 'runtime-only'),
             scriptNames.join(',')
         ].join('|');
 
