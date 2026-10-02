@@ -731,9 +731,12 @@
         return assets;
     }
 
-    function buildOrderedScriptList(enabled, majorVersion, byName) {
+    function buildOrderedScriptList(enabled, majorVersion, byName, onlyScriptNames) {
+        const onlyScripts = Array.isArray(onlyScriptNames) ? new Set(onlyScriptNames) : null;
         const enabledScripts = SCRIPT_DEFINITIONS.filter(
-            (s) => enabled[s.name] && isScriptCompatible(s, majorVersion)
+            (s) => enabled[s.name]
+                && isScriptCompatible(s, majorVersion)
+                && (!onlyScripts || onlyScripts.has(s.name))
         );
         const allDependencyNames = new Set();
         enabledScripts.forEach((script) => {
@@ -788,7 +791,7 @@
         // configOnly remains available for the explicit admin/configuration load path.
         const includeConfiguration = options.includeConfiguration === true;
 
-        let scriptNames = featuresDisabled ? [] : buildOrderedScriptList(enabled, majorVersion, byName);
+        let scriptNames = featuresDisabled ? [] : buildOrderedScriptList(enabled, majorVersion, byName, options.onlyScripts);
         if (includeConfiguration) {
             const configNames = buildConfigScriptList(enabled, majorVersion, byName);
             configNames.forEach((n) => {

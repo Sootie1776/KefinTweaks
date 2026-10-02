@@ -4,14 +4,26 @@
 (function () {
     'use strict';
 
-    const config = window.KefinTweaksConfig || {};
-    const rawRoot = config.kefinTweaksRootResolved || config.kefinTweaksRoot || '';
+    const config = window.KefinTweaksConfig || (window.KefinTweaksConfig = {});
+    const bootstrapUrl = document.currentScript?.src || '';
+    let rawRoot = '';
+    try {
+        rawRoot = bootstrapUrl ? new URL('.', bootstrapUrl).href : '';
+    } catch (_) {
+        rawRoot = '';
+    }
+    rawRoot = rawRoot || config.kefinTweaksRootResolved || config.kefinTweaksRoot || '';
     const root = String(rawRoot).replace(/\/+$/, '') + '/';
 
     if (!rawRoot) {
         console.warn('[KefinTweaks Runtime] No kefinTweaksRoot configured');
         return;
     }
+
+    // Keep every runtime asset on the same revision as this bootstrap. The saved
+    // installer config may still point at an older commit after a test upgrade.
+    config.kefinTweaksRoot = root;
+    config.kefinTweaksRootResolved = root;
 
     function loadScript(url) {
         return new Promise((resolve, reject) => {
