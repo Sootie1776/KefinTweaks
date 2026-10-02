@@ -1685,20 +1685,37 @@
         }
     }
 
+    function scheduleStartupTask() {
+        // Configuration editors are only needed in admin settings. For the
+        // allowlisted performance test account on Home, avoid loading them
+        // before the home screen's LCP. Other routes and users keep the
+        // existing one-second startup.
+        window.setTimeout(() => {
+            const hash = String(window.location?.hash || '').toLowerCase();
+            const isHomeRoute = /^#\/(?:home(?:\.html)?)(?:[/?]|$)/.test(hash);
+            if (isHomeRoute && isPerformanceTestUser(window.KefinTweaksConfig)) {
+                console.log('[KefinTweaks Startup] Deferring admin configuration until after LCP for test user');
+                scheduleAfterLargestContentfulPaint(startupTask);
+                return;
+            }
+            startupTask();
+        }, 1000);
+    }
+
     // Start initialization when DOM is ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', async () => {
             await injectVersionBadgeCSS();
             initialize();
             // Run startup task after a short delay to ensure ApiClient is ready
-            setTimeout(startupTask, 1000);
+            scheduleStartupTask();
         });
     } else {
         (async () => {
             await injectVersionBadgeCSS();
             initialize();
             // Run startup task after a short delay to ensure ApiClient is ready
-            setTimeout(startupTask, 1000);
+            scheduleStartupTask();
         })();
     }
     
