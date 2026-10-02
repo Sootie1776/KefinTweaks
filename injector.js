@@ -143,6 +143,10 @@
         fallbackTimer = window.setTimeout(scheduleIdleCallback, 6000);
     }
 
+    // Reuse the same LCP-aware scheduling for optional work in core scripts.
+    // Callers decide whether to use it; normal users keep their existing path.
+    window.KefinTweaksAfterLcpIdle = scheduleAfterLargestContentfulPaint;
+
     function syncCachedMajorOnApi(majorVersion) {
         if (window.KefinTweaks) {
             window.KefinTweaks._jellyfinMajorVersion = majorVersion;

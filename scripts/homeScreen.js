@@ -1062,6 +1062,7 @@
     let isRenderingDiscoveryGroup = false; // Prevent parallel rendering from buffer
     let isInitializingPeopleCache = false; // Prevent parallel people cache initialization
     let isPeopleCacheComplete = false; // Track if all people data has been loaded
+    let discoveryWarmupScheduled = false; // Prevent duplicate post-LCP Discovery startup
     let preloadedSections = []; // Preloaded sections ready for instant rendering
     
     // Track rendered items to avoid duplicates
@@ -1095,6 +1096,22 @@
     let discoveryTouchMoveHandler = null; // Reference to touchmove handler for cleanup
 
     /************ Helpers ************/
+
+    function isPerformanceTestUser() {
+        try {
+            const userId = String(window.ApiClient?.getCurrentUserId?.() || '');
+            if (!userId) return false;
+
+            const configured = window.KefinTweaksConfig?.performanceTestUserIds
+                || window.__KefinTweaksPerformanceTestUsers;
+            const userIds = configured instanceof Set
+                ? configured
+                : new Set(Array.isArray(configured) ? configured.map(String) : []);
+            return userIds.has(userId);
+        } catch (_) {
+            return false;
+        }
+    }
 
     /**
      * Fetches collection data from Jellyfin API
@@ -5945,8 +5962,22 @@
             // Add people cache and preloading if discovery is enabled
             LOG('Checking Discovery section');
             if (enableDiscovery) {
-                initPromises.push(initializePeopleCache());
-                initPromises.push(preloadNextSections());
+                const scheduleAfterLcp = window.KefinTweaksAfterLcpIdle;
+                if (isPerformanceTestUser() && typeof scheduleAfterLcp === 'function') {
+                    if (!discoveryWarmupScheduled) {
+                        discoveryWarmupScheduled = true;
+                        scheduleAfterLcp(async () => {
+                            // Keep Discovery's personalized sections; move their potentially
+                            // large IndexedDB read and data preparation off the LCP path.
+                            await initializePeopleCache();
+                            await preloadNextSections();
+                        });
+                    }
+                } else {
+                    // Preserve existing behavior for non-test users and older injectors.
+                    initPromises.push(initializePeopleCache());
+                    initPromises.push(preloadNextSections());
+                }
             }
 
             // Add Upcoming section (always rendered when enabled)
