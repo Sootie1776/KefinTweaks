@@ -86,6 +86,22 @@
         return scriptDef.versions.includes(majorVersion);
     }
 
+    function isPerformanceTestUser(config) {
+        try {
+            const userId = String(window.ApiClient?.getCurrentUserId?.() || '');
+            if (!userId) return false;
+
+            const configured = config?.performanceTestUserIds
+                || window.__KefinTweaksPerformanceTestUsers;
+            const userIds = configured instanceof Set
+                ? configured
+                : new Set(Array.isArray(configured) ? configured.map(String) : []);
+            return userIds.has(userId);
+        } catch (_) {
+            return false;
+        }
+    }
+
     function syncCachedMajorOnApi(majorVersion) {
         if (window.KefinTweaks) {
             window.KefinTweaks._jellyfinMajorVersion = majorVersion;
@@ -1240,39 +1256,10 @@
             });
 
             const configEnabled = config.enabled !== false;
-            const coreScriptNames = ['homeScreen', 'headerTabs', 'customMenuLinks', 'backdropLeakFix', 'dashboardButtonFix'];
-            const corePlan = configEnabled
-                ? Loader.buildLoadPlan(config, majorVersion, {
-                    root,
-                    urlSuffix,
-                    includeConfiguration: false,
-                    onlyScripts: coreScriptNames
-                })
-                : Loader.buildLoadPlan(config, majorVersion, {
-                    root,
-                    urlSuffix,
-                    configOnly: true,
-                    includeConfiguration: false
-                });
-
-            console.log('[KefinTweaks Injector] Applying initial UI assets:', corePlan.assets.length, 'of', plan.assets.length);
-            // These scripts cover the home view and navigation. Other enabled
-            // features are appended when the browser is idle, after first paint.
-            Loader.applyAssetsToDocument(corePlan.assets);
-
-            const coreNames = new Set(corePlan.scriptNames);
-            const deferredNames = plan.scriptNames.filter((name) => !coreNames.has(name));
-            const deferredPlan = deferredNames.length
-                ? Loader.buildLoadPlan(config, majorVersion, {
-                    root,
-                    urlSuffix,
-                    includeConfiguration: false,
-                    onlyScripts: deferredNames
-                })
-                : null;
-
-            const loadDeferredAssets = () => {
-                if (deferredPlan) Loader.applyAssetsToDocument(deferredPlan.assets);
+            if (!isPerformanceTestUser(config)) {
+                // Keep the existing startup behavior for everyone outside the
+                // private allowlist; performance experiments stay account-scoped.
+                Loader.applyAssetsToDocument(plan.assets);
                 document.dispatchEvent(new CustomEvent('kefinTweaksLoaded', {
                     detail: {
                         loadedScripts: plan.scriptNames,
@@ -1281,17 +1268,61 @@
                         live: true
                     }
                 }));
-                console.log('[KefinTweaks Injector] Deferred UI assets appended:', deferredPlan?.assets.length || 0);
-            };
-
-            if (deferredPlan) {
-                if (typeof window.requestIdleCallback === 'function') {
-                    window.requestIdleCallback(loadDeferredAssets, { timeout: 2000 });
-                } else {
-                    window.setTimeout(loadDeferredAssets, 1200);
-                }
+                console.log('[KefinTweaks Injector] Applying standard UI asset plan for non-test user');
             } else {
-                loadDeferredAssets();
+                const coreScriptNames = ['homeScreen', 'headerTabs', 'customMenuLinks', 'backdropLeakFix', 'dashboardButtonFix'];
+                const corePlan = configEnabled
+                    ? Loader.buildLoadPlan(config, majorVersion, {
+                        root,
+                        urlSuffix,
+                        includeConfiguration: false,
+                        onlyScripts: coreScriptNames
+                    })
+                    : Loader.buildLoadPlan(config, majorVersion, {
+                        root,
+                        urlSuffix,
+                        configOnly: true,
+                        includeConfiguration: false
+                    });
+
+                console.log('[KefinTweaks Injector] Applying initial UI assets:', corePlan.assets.length, 'of', plan.assets.length);
+                // These scripts cover the home view and navigation. Other enabled
+                // features are appended when this allowlisted account is idle.
+                Loader.applyAssetsToDocument(corePlan.assets);
+
+                const coreNames = new Set(corePlan.scriptNames);
+                const deferredNames = plan.scriptNames.filter((name) => !coreNames.has(name));
+                const deferredPlan = deferredNames.length
+                    ? Loader.buildLoadPlan(config, majorVersion, {
+                        root,
+                        urlSuffix,
+                        includeConfiguration: false,
+                        onlyScripts: deferredNames
+                    })
+                    : null;
+
+                const loadDeferredAssets = () => {
+                    if (deferredPlan) Loader.applyAssetsToDocument(deferredPlan.assets);
+                    document.dispatchEvent(new CustomEvent('kefinTweaksLoaded', {
+                        detail: {
+                            loadedScripts: plan.scriptNames,
+                            stamp: plan.stamp,
+                            timestamp: new Date().toISOString(),
+                            live: true
+                        }
+                    }));
+                    console.log('[KefinTweaks Injector] Deferred UI assets appended:', deferredPlan?.assets.length || 0);
+                };
+
+                if (deferredPlan) {
+                    if (typeof window.requestIdleCallback === 'function') {
+                        window.requestIdleCallback(loadDeferredAssets, { timeout: 2000 });
+                    } else {
+                        window.setTimeout(loadDeferredAssets, 1200);
+                    }
+                } else {
+                    loadDeferredAssets();
+                }
             }
 
             if (typeof Loader.syncKefinTweaksInjector === 'function') {
