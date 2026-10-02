@@ -102,6 +102,47 @@
         }
     }
 
+    function scheduleAfterLargestContentfulPaint(callback) {
+        let scheduled = false;
+        let quietTimer = null;
+        let fallbackTimer = null;
+        let observer = null;
+
+        const scheduleIdleCallback = () => {
+            if (scheduled) return;
+            scheduled = true;
+            if (quietTimer !== null) window.clearTimeout(quietTimer);
+            if (fallbackTimer !== null) window.clearTimeout(fallbackTimer);
+            observer?.disconnect();
+
+            if (typeof window.requestIdleCallback === 'function') {
+                window.requestIdleCallback(callback, { timeout: 1500 });
+            } else {
+                window.setTimeout(callback, 300);
+            }
+        };
+
+        // LCP can advance as home-screen sections and lazy images appear. Wait
+        // for a quiet period after the most recent candidate so optional
+        // feature assets do not compete with the initial home view.
+        try {
+            if (typeof window.PerformanceObserver === 'function') {
+                observer = new window.PerformanceObserver((list) => {
+                    if (!list.getEntries().length || scheduled) return;
+                    if (quietTimer !== null) window.clearTimeout(quietTimer);
+                    quietTimer = window.setTimeout(scheduleIdleCallback, 1000);
+                });
+                observer.observe({ type: 'largest-contentful-paint', buffered: true });
+            }
+        } catch (_) {
+            observer?.disconnect();
+            observer = null;
+        }
+
+        // Always make forward progress if LCP is unsupported or never reported.
+        fallbackTimer = window.setTimeout(scheduleIdleCallback, 6000);
+    }
+
     function syncCachedMajorOnApi(majorVersion) {
         if (window.KefinTweaks) {
             window.KefinTweaks._jellyfinMajorVersion = majorVersion;
@@ -1315,11 +1356,7 @@
                 };
 
                 if (deferredPlan) {
-                    if (typeof window.requestIdleCallback === 'function') {
-                        window.requestIdleCallback(loadDeferredAssets, { timeout: 2000 });
-                    } else {
-                        window.setTimeout(loadDeferredAssets, 1200);
-                    }
+                    scheduleAfterLargestContentfulPaint(loadDeferredAssets);
                 } else {
                     loadDeferredAssets();
                 }
