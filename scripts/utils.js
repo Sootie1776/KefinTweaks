@@ -2417,18 +2417,44 @@ window.KefinTweaksConfig = ${JSON.stringify(configToSave, null, 2)};`;
     }
 
     let _watchlistTabIndex = null;
+    let _customTabsConfigPromise = null;
+
+    async function getCustomTabsConfig() {
+        if (!_customTabsConfigPromise) {
+            _customTabsConfigPromise = (async () => {
+                const response = await fetch(`${ApiClient._serverAddress}/CustomTabs/Config`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': getAuthHeader(),
+                    },
+                });
+
+                // The plugin is optional. Cache its absence for this page session
+                // so every navigation does not repeat the same guaranteed 404.
+                if (response.status === 404) return [];
+                if (!response.ok) {
+                    throw new Error(`CustomTabs/Config request failed: ${response.status}`);
+                }
+
+                const text = await response.text();
+                if (!text.trim()) return [];
+                const data = JSON.parse(text);
+                return Array.isArray(data) ? data : [];
+            })().catch((error) => {
+                // Retry on the next call for transient network/server/parse errors.
+                _customTabsConfigPromise = null;
+                throw error;
+            });
+        }
+
+        return _customTabsConfigPromise;
+    }
 
     async function fetchWatchlistTabIndex() {
         // Fetch the tab index as we do in addCustomMenuLink
         try {
-            const response = await fetch(`${ApiClient._serverAddress}/CustomTabs/Config`, {
-                method: "GET",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": getAuthHeader(),
-                },
-            });
-            const data = await response.json();
+            const data = await getCustomTabsConfig();
             let tabIndex = null;
             data.forEach((tab, index) => {
                 if (tab.ContentHtml.indexOf('sections watchlist') !== -1) {
@@ -3013,6 +3039,7 @@ main.MuiBox-root .customPage.libraryPage:not(.noSecondaryNavPage)[data-kefin-cus
         resolvePluginId,
         getPluginConfiguration,
         clearPluginIdCache,
+        getCustomTabsConfig,
         getWatchlistTabIndex,
         waitForApiClient,
         waitForLogin,

@@ -400,20 +400,7 @@
                 // Check for custom tabs (plugin may be missing / return empty body)
                 let customTabs = [];
                 try {
-                    const response = await fetch(`${ApiClient._serverAddress}/CustomTabs/Config`, {
-                        method: "GET",
-                        headers: {
-                            "Content-Type": "application/json",
-                            "Authorization": window.apiHelper.getAuthHeader(),
-                        },
-                    });
-                    if (response.ok) {
-                        const text = await response.text();
-                        if (text && text.trim()) {
-                            const parsed = JSON.parse(text);
-                            customTabs = Array.isArray(parsed) ? parsed : [];
-                        }
-                    }
+                    customTabs = await window.KefinTweaksUtils.getCustomTabsConfig();
                 } catch (e) {
                     WARN('CustomTabs/Config unavailable, skipping custom tab listeners:', e?.message || e);
                 }
